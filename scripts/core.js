@@ -200,9 +200,12 @@ MD.addFunction("createTopic", function(){
 	var title;
 	if(selected.length == 0){
 		parentId = "root";
-		title = "分支主题";
 	}else{
 		parentId = selected[selected.length - 1];
+	}
+	if(parentId == "root"){
+		title = "分支主题";
+	}else{
 		title = "子主题";
 	}
 	var newId = MD.newId();
@@ -220,6 +223,8 @@ MD.addFunction("createTopic", function(){
 		topics[parentId].children = [];
 	}
 	topics[parentId].children.push(topic.id);
+	MD.unselect();
+	MD.select(topic.id);
 });
 /**
  * 创建图形
@@ -232,44 +237,54 @@ MD.addFunction("updateTopic", function(topic){
  * 创建图形
  */
 MD.addFunction("renderTopic", function(topic){
-	var topicHtml = "<div class='tp_container'><div id='" + topic.id + "' class='tp_box'><div class='topic'>" + topic.title + "</div></div></div>";
-	var container;
-	if(topic.parent == "root"){
-		container = $(topicHtml).appendTo(MD.canvas);
-		container.css("position", "absolute");
-		if(topic.pos == null){
-			//定位放置主题
-			MD.placeTopic(topic);
-		}
-		var center = {
-			x: MD.config.canvasWidth / 2,
-			y: MD.config.canvasHeight / 2
-		};
-		container.css("top", center.y + topic.pos.y - container.height()/2);
-		if(topic.pos.x < 0){
-			var box = $("#" + topic.id);
-			container.css("left", center.x + topic.pos.x + box.outerWidth() - container.width());
+	var center = {
+		x: MD.config.canvasWidth / 2,
+		y: MD.config.canvasHeight / 2
+	};
+	//获取主题的DOM
+	//判断主题DOM是否存在，否则添加主题DOM
+	var topicDom = MD.getContainer(topic.id);
+	if(topicDom.length == 0){
+		var topicHtml = "<div class='tp_container'><div id='" + topic.id + "' class='tp_box'><div class='topic'>" + topic.title + "</div></div></div>";
+		var appendTarget;
+		//确定要往哪个元素里添加
+		if(topic.parent == "root"){
+			appendTarget = MD.canvas;
 		}else{
-			container.css("left", center.x + topic.pos.x);
-		}
-		//绘制连接线
-		drawLinker(topic, container);
-//		addTopic(newTopic);
-	}else{
-		//如果是子主题，容器为父主题的tp_children元素
-		var container = $("#" + parentId).siblings(".tp_children");
-		var mainTopic = MD.getTreeRoot(parentId);
-		var mainTopicContainer = MD.getContainer(mainTopic.id);
-		var mainRight = mainTopicContainer.position().left + mainTopicContainer.width();
-		//如果没有tp_children元素，创建
-		if(container.length == 0){
-			if(mainTopic.pos.x < 0){
-				container = $("<div class='tp_children'></div>").prependTo($("#" + parentId).parent());
-			}else{
-				container = $("<div class='tp_children'></div>").appendTo($("#" + parentId).parent());
+			var mainTopic = MD.getTreeRoot(topic.parent);
+			//如果是子主题，容器为父主题的tp_children元素
+			var appendTarget = $("#" + topic.parent).siblings(".tp_children");
+			//如果没有tp_children元素，创建
+			if(appendTarget.length == 0){
+				if(mainTopic.pos.x < 0){
+					appendTarget = $("<div class='tp_children'></div>").prependTo(MD.getContainer(topic.parent));
+				}else{
+					appendTarget = $("<div class='tp_children'></div>").appendTo(MD.getContainer(topic.parent));
+				}
 			}
 		}
+		topicDom = $(topicHtml).appendTo(appendTarget);
 	}
+	var mainTopic;
+	if(topic.parent == "root"){
+		mainTopic = topic;
+		topicDom.css("position", "absolute");
+	}else{
+		mainTopic = MD.getTreeRoot(topic.parent);
+	}
+	if(topic.parent == "root" && topic.pos == null){
+		//定位放置主题
+		MD.placeTopic(topic);
+	}
+	var mainContainer = MD.getContainer(mainTopic.id);
+	mainContainer.css("top", center.y + mainTopic.pos.y - mainContainer.height()/2);
+	if(mainTopic.pos.x < 0){
+		var box = $("#" + mainTopic.id);
+		mainContainer.css("left", center.x + mainTopic.pos.x + box.outerWidth() - mainContainer.width());
+	}else{
+		mainContainer.css("left", center.x + mainTopic.pos.x);
+	}
+	drawLinker(mainTopic, mainContainer);
 	/**
 	 * 绘制连接线
 	 */
@@ -284,8 +299,9 @@ MD.addFunction("renderTopic", function(topic){
 			linker.x = 0;
 			linker.w = Math.abs(pos.x) + 2;
 		}else{
-			linker.x = pos.x + container.width() - 2;
-			linker.w = Math.abs(pos.x + container.width());
+			var topicW = container.children(".tp_box").outerWidth();
+			linker.x = pos.x + topicW - 2;
+			linker.w = Math.abs(pos.x + topicW);
 		}
 		//因为边缘绘制问题，画布实际大出10像素
 		linker.h = Math.abs(pos.y);
@@ -400,6 +416,8 @@ MD.addFunction("placeTopic", function(tp){
 		}else{
 			pos.y = 100;
 		}
+	}else{
+		
 	}
 	tp.pos = pos;
 });
